@@ -3,7 +3,7 @@ clear
 cargar_rutas_locales
 addpath('utils')
 
-listest0 = dir(fullfile(rutahv));
+listest0 = dir(rutahv);
 bal = [listest0.isdir]';
 listest0 = {listest0.name}';
 listest = listest0(bal);
@@ -18,13 +18,17 @@ vecest = estacRED{1};
 latest = estacRED{3};
 lonest = estacRED{2};
 
+%% Buscar estación
 buscar = listest;
-% buscar = {'TOME'};
+% buscar = vecest(ismember(arreglo,{'A01';'A02';'A03';'A04';'A05';'A06';'A07'}));
+% buscar = {'CM001'};
 
-listabal = cell2mat(listest);
-[~,Nbuscar] = ismember(buscar,listabal);
+[~,Nbuscar] = ismember(buscar,listest);
 Nest = length(buscar);
 
+quitar = {'CM009';'CM130';'CM235';'CM195';'CM323';'CM325';'CM369';'CM402';'CH011';'CM268';'CM263';'CM251';'CM185'};
+
+%%
 figure(100)
 hjet = colormap(jet);
 close(100)
@@ -39,33 +43,61 @@ Ntetalista = [];
 Ntetalista2 = [];
 gamamaxlista = [];
 gamaminlista = [];
+HVtotmat = [];
 leyenda = [];
 suav = 0;   %0=no; 1=sí
-fs = 12;
-porc = length(hjet(:,1))/length(buscar);
-for k = 1:length(buscar)
+fs = 9;
+porc = length(hjet(:,1))/Nest;
+ck = 0;
+buscarnew = [];
+Nbuscarnew = [];
+for k = 1:Nest
     estac = listest{Nbuscar(k)};
-    fprintf(1,'%d%s%d%s%s\n',k,'/',length(buscar),' --> ',estac);
+    fprintf(1,'%d%s%d%s%s\n',k,'/',Nest,' --> ',estac);
 
-    listreg = dir(fullfile(rutahv,estac,'*.mat'));
+    if ismember(estac,quitar)
+        continue
+    end
+    ck = ck+1;
+    buscarnew = [buscarnew;{estac}];
+    Nbuscarnew = [Nbuscarnew;Nbuscar(k)];
+
+    listreg = dir([rutahv,estac,'\*.mat']);
     listreg = {listreg.name}';
-    listreg = strrep(listreg,'.mat','');
 
-    load(fullfile(rutahv,estac,listreg{1}));
+    load([rutahv,estac,'\',listreg{1}]);
+    if HV.Nvent{1} == 0; continue; end
+
     tetavec = HV.tetarot;
-    HVtot = HV.HVtot_comb1;
+    HVtot = HV.HVmean_comb{1};
     HVdir = HV.HVdir_comb1;
-    f = HV.f_comb1;
+    f = HV.fcomb{1};
+    comb = HV.clavecomb{1};
 
-    ind90 = (length(tetavec)+1)/2;
+    df = f(2)-f(1);
+    dfnew = 0.01;
+    if dfnew < df
+        ff = f(1):dfnew:f(end);
+        HVtot = spline(f,HVtot,ff);
+        HVdir = spline(f,HVdir,ff);
+        f = ff;
+    end
+
     if suav == 1
-        Nsuav = fix(length(find(f>=0.1,1):find(f>=0.2,1))/4);
+        Nsuav = 0; %fix(length(find(f>=0.1,1):find(f>=0.2,1))/4);
         for i = 1:length(HVdir(:,1))
             HVdir(i,:) = fsuavi(HVdir(i,:).',f,Nsuav,fs);
         end
         HVtot = fsuavi(HVtot,f,Nsuav,fs);
     end
+
+    ind90 = (length(tetavec)+1)/2;
     HVdircont = HVdir([ind90:end,2:ind90],:);
+
+    if ismember(estac,{'MT06';'MT07';'MT08';'MT18';'MT19'})
+        HVdir = HVdircont;
+        HVdircont = HVdir([ind90:end,2:ind90],:);
+    end
 
     % figure(200)
     % col = fix(porc*k);
@@ -80,13 +112,13 @@ for k = 1:length(buscar)
     % set(gca,'fontname','Times New Roman','fontSize',14)
     % xlim([0.1,50])
 
-    flim1 = f(1); %20
-    flim2 = f(end);
+    flim1 = 0.5; %f(1)
+    flim2 = 3; %f(end)
     Nflim1 = find(f>=flim1,1,'first');
     Nflim2 = find(f>=flim2,1,'first');
     [~,Nfmax0] = max(HVtot(Nflim1:Nflim2));
 
-    % Nfmax0 = 18;
+    % Nfmax0 = 11;
     % Nflim1 = 1;
 
     Nfmax = Nfmax0+Nflim1-1;
@@ -94,8 +126,8 @@ for k = 1:length(buscar)
     flim4 = f(Nfmax)+0.0; %0.22
     Nf1 = find(f>=flim3,1); %
     Nf2 = find(f>=flim4,1); %
-    flim1graf = f(1);  % para graficar
-    flim2graf = f(end);  % para graficar
+    flim1graf = f(1); % Solo para graficar
+    flim2graf = 5;    %f(end) Solo para graficar
     paso = 1;
     Ntickmax = 6;
 
@@ -107,7 +139,7 @@ for k = 1:length(buscar)
 
     if f(Nf1) < flim1; Nf1 = Nflim1; end
     if f(Nf2) > flim2; Nf2 = Nflim2; end
-    gamanumerador = abs((HVdir(:,Nf1:Nf2))-(HVdircont(:,Nf1:Nf2)));
+    gamanumerador = abs((HVdircont(:,Nf1:Nf2))-(HVdir(:,Nf1:Nf2)));
     gamadenominador = zeros(length(tetavec),Nf2-Nf1+1);
     cont = 0;
     for kk = Nf1:Nf2
@@ -132,8 +164,8 @@ for k = 1:length(buscar)
     gamamaxlista = [gamamaxlista;gamamax(end)];
 %     [~,bal] = max(HVdircont(Ntetamax0(Norden),Nf1:Nf2));
 %     Nteta = Ntetamax0(Norden(bal));
-    [~,bal1] = max(HVdircont(:,Nf1:Nf2));
-    [~,bal2] = max(max(HVdircont(:,Nf1:Nf2)));
+    [~,bal1] = max(HVdir(:,Nf1:Nf2));
+    [~,bal2] = max(max(HVdir(:,Nf1:Nf2)));
     Nteta = bal1(bal2);
     
     [gamamin0,Ntetamin0] = minimos(gama,2);
@@ -160,8 +192,9 @@ for k = 1:length(buscar)
     Ntetalista2 = [Ntetalista2;Nteta2];
 
     %% Figuras
-    figure(k+200)
-    tiledlayout(2,2);
+    figure(k) %(k+200)
+    hh = tiledlayout(2,2);
+    title(hh,[{HV.estac},{HV.clavecomb{1}}],'fontname','Times New Roman','fontSize',14)
     set(gcf,'position',get(0,'Screensize'))
     % if k == 1
     %     h = tiledlayout(2,3);%
@@ -175,7 +208,7 @@ for k = 1:length(buscar)
     % xlim([0.01 f(end)])
     xlim([flim1graf flim2graf])
     ylim([0 180])
-    title(estac,'fontname','Times New Roman','fontSize',14,'interpreter','latex')
+    % title(estac,'fontname','Times New Roman','fontSize',14,'interpreter','latex')
     xlabel('Frequency, $f$ (Hz)','fontname','Times New Roman','fontsize',14,'interpreter','latex')
     ylabel('Rotation angle, $\varphi$ (deg)','fontname','Times New Roman','fontsize',14,'interpreter','latex')
     set(gca,'xscale','log')
@@ -198,7 +231,8 @@ for k = 1:length(buscar)
     semilogx(f(Nflim1graf:Nflim2graf),HVtot(Nflim1graf:Nflim2graf),'k','linewidth',1); hold on
     semilogx(f(Nflim1graf:Nflim2graf),HVdircont(Nteta,Nflim1graf:Nflim2graf),'r','linewidth',1); hold on
     semilogx(f(Nflim1graf:Nflim2graf),HVdir(Nteta,Nflim1graf:Nflim2graf),'--b','linewidth',1); hold on
-    limy = max(HVtot(Nflim1graf:Nflim2graf));
+    % limy = max(HVtot(Nflim1:Nflim2));
+    limy = max(HVtot(Nflim1:Nflim2));
     fill(f([Nf1,Nf2,Nf2,Nf1,Nf1]),[0,0,limy,limy,0],colfill,'facealpha',0.2); hold on
     xlim([flim1graf flim2graf])
     % ylim([0 20]) %[0 limy+3]
@@ -219,13 +253,15 @@ for k = 1:length(buscar)
     if tetamod > 180;tetamod = tetamod-180; end
     % leg = legend('$H/V$ total',['$H^\prime/V(\varphi,f), \varphi=',num2str(tetavec(Nteta)),'^o$'],['$H^\prime/V(\varphi,f), \varphi=',num2str(tetamod),'^o$'],[num2str(flim3),' Hz$\leq f\leq$',num2str(flim4),' Hz']);
     leg = legend('$H/V$ total',['$H^\prime/V(\varphi,f), \varphi=',num2str(tetavec(Nteta)),'^o$'],['$H^\prime/V(\varphi,f), \varphi=',num2str(tetamod),'^o$']);
-    set(leg,'fontname','Times New Roman','fontSize',13,'interpreter','latex')
+    set(leg,'location','eastoutside','fontname','Times New Roman','fontSize',13,'interpreter','latex')
 
-    saveas(gcf,[rutahv,estac,'.png'])
-    % print(gcf,[rutahv,estac],'-dpng','-r300')
+    % saveas(gcf,[rutahv,estac,'.png'])
+    % % print(gcf,[rutahv,estac],'-dpng','-r300')
 
-    listafrec(k,:) = [str2num(estac(3:end)) f(Nfmax)];
+    HVtotmat(:,ck) = HVtot;
 end
+Nestnew = length(Nbuscarnew);
+
 % figure(200)
 % saveas(gcf,[rutahv,'HV.png'])
 
@@ -236,46 +272,76 @@ maxT0lista = max(T0lista);
 minT0lista = min(T0lista);
 
 %% Mapa con resultados de cada estación
-lx = abs(min(lonest)-max(lonest))*0.3;
-ly = abs(min(lonest)-max(lonest))*0.3;
-MapLatLimit = [min(latest)-ly max(latest)+ly];
-MapLonLimit = [min(lonest)-lx max(lonest)+lx];
+lonbusc = lonest(ismember(vecest,buscarnew));
+latbusc = latest(ismember(vecest,buscarnew));
+
+lx0 = abs(min(lonbusc)-max(lonbusc));
+ly0 = abs(min(lonbusc)-max(lonbusc));
+lx = lx0*0.1;
+ly = ly0*0.1;
+MapLatLimit = [min(latbusc)-ly max(latbusc)+ly];
+MapLonLimit = [min(lonbusc)-lx max(lonbusc)+lx];
+
+factoresc = (max(max(gamamaxlista))/2)/min([lx0*0.1 ly0*0.1]);
+
+figure(400)
+set(gcf,'Position',[977.8 49.8 558.4 732.8])
+leyenda = [];
+for k = 1:Nestnew
+    estac = listest{Nbuscarnew(k)};
+    estac = strrep(estac,'-','p');
+
+    col = fix(porc*k);
+    if col > length(hjet(:,1)); col = length(hjet(:,1)); end
+    if col < 1; col = 1; end
+    semilogx(f,HVtotmat(:,k),'color',hjet(col,:),'linewidth',2); hold on; grid on
+    xlabel('Frecuencia, $f$ (Hz)','fontname','Times New Roman','fontsize',14,'interpreter','latex')
+    ylabel('$H/V$ amplitud','fontname','Times New Roman','fontsize',14,'interpreter','latex')
+    leyenda = [leyenda;{estac}];
+    legend(leyenda,'numcolumns',1)
+    set(gcf,'color','white')
+    set(gca,'fontname','Times New Roman','fontSize',14)
+    xlim([f(1),10])
+    ylim([0 25])
+end
 
 figure(500)
+set(gcf,'Position',[1.8 49.8 974.4 732.8])
 geolimits(MapLatLimit,MapLonLimit)
 geobasemap satellite
-tamanofuente = 18;
 porc = length(hjet(:,1))/maxT0lista;
-for k = 1:length(buscar)
+estaclist = [];
+for k = 1:Nestnew
     % filacolor = fix(porc*T0lista(k));
     % if filacolor > length(hjet(:,1)); filacolor = length(hjet(:,1)); end
     % if filacolor < 1; filacolor = 1; end
-    
-    estac = listest{Nbuscar(k)};
+
+    estac = listest{Nbuscarnew(k)};
+    estac = strrep(estac,'-','p');
     [~,bal] = ismember(estac,vecest);
     lat(k,1) = latest(bal);
     lon(k,1) = lonest(bal);
 
     col = 'white';
-    escmax = (gamamaxlista(k)/2)/3000;
-    plot_arrow_geoplot([lat(k),lon(k)],[lat(k)-sind(tetavec(Ntetalista(k)))*escmax,lon(k)-cosd(tetavec(Ntetalista(k)))*escmax],'color',col,'LineWidth',3); hold on
-    plot_arrow_geoplot([lat(k),lon(k)],[lat(k)+sind(tetavec(Ntetalista(k)))*escmax,lon(k)+cosd(tetavec(Ntetalista(k)))*escmax],'color',col,'LineWidth',3); hold on
-    plot_arrow_geoplot([lat(k),lon(k)],[lat(k)-sind(tetavec(Ntetalista(k)))*escmax,lon(k)-cosd(tetavec(Ntetalista(k)))*escmax],'color','r','LineWidth',1.5); hold on
-    plot_arrow_geoplot([lat(k),lon(k)],[lat(k)+sind(tetavec(Ntetalista(k)))*escmax,lon(k)+cosd(tetavec(Ntetalista(k)))*escmax],'color','r','LineWidth',1.5); hold on
+    escmax = (gamamaxlista(k)/2)/factoresc;
+    plot_arrow_geoplot([lat(k),lon(k)],[lat(k)-sind(tetavec(Ntetalista(k)))*escmax,lon(k)-cosd(tetavec(Ntetalista(k)))*escmax],'color',col,'LineWidth',2); hold on
+    plot_arrow_geoplot([lat(k),lon(k)],[lat(k)+sind(tetavec(Ntetalista(k)))*escmax,lon(k)+cosd(tetavec(Ntetalista(k)))*escmax],'color',col,'LineWidth',2); hold on
+    plot_arrow_geoplot([lat(k),lon(k)],[lat(k)-sind(tetavec(Ntetalista(k)))*escmax,lon(k)-cosd(tetavec(Ntetalista(k)))*escmax],'color','white','LineWidth',3); hold on
+    plot_arrow_geoplot([lat(k),lon(k)],[lat(k)+sind(tetavec(Ntetalista(k)))*escmax,lon(k)+cosd(tetavec(Ntetalista(k)))*escmax],'color','white','LineWidth',3); hold on
 
     % geoplot([lat(k),lat(k)-sind(tetavec(Ntetalista(k)))*escmax],[lon(k),lon(k)-cosd(tetavec(Ntetalista(k)))*escmax],col,'LineWidth',3); hold on
     % geoplot([lat(k),lat(k)+sind(tetavec(Ntetalista(k)))*escmax],[lon(k),lon(k)+cosd(tetavec(Ntetalista(k)))*escmax],col,'LineWidth',3); hold on
 
-    text(lat(k),lon(k)+0.00002,estac,'color','white','fontname','Times New Roman','fontSize',14); hold on
+    estaclist = [estaclist;{estac}];
 end
-geoplot(lat,lon,'.','markersize',20,'linewidth',2,'MarkerEdgeColor','white','markerfacecolor','none'); hold on;  % col(prof(jj),:)
+geoplot(lat,lon,'+k','markersize',8,'linewidth',0.5,'MarkerEdgeColor','white','markerfacecolor','none'); hold on
+text(lat,lon+lx*0.1,estaclist,'color','white','fontname','Times New Roman','fontSize',12); hold on
 geolimits(MapLatLimit,MapLonLimit)
-Tmin = num2str(round(1/flim4*10)/10);
-Tmax = num2str(round(1/flim3*10)/10);
-title(['$\gamma_{max}$ (',Tmin,' s $\leq T_s \leq$ ',Tmax,' s)'],'fontname','Times New Roman','fontSize',tamanofuente,'interpreter','latex')
+fmin = num2str(round(flim3*10)/10);
+fmax = num2str(round(flim4*10)/10);
+title(['$\gamma_{max}$ (',fmin,' Hz $\leq f_s \leq$ ',fmax,' Hz)'],'fontname','Times New Roman','fontSize',14,'interpreter','latex')
 % set(gcf,'Position',get(0,'Screensize'))
-set(gcf,'Position',[1.8,49.8,766.4,732.8])
 set(gcf,'color','white')
-set(gca,'fontname','Times New Roman','fontSize',tamanofuente)
+set(gca,'fontname','Times New Roman','fontSize',14)
 
 % saveas(gcf,[rutahv,'mapaHVdir.png'])

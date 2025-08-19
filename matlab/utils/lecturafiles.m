@@ -1,6 +1,6 @@
 function [reg100,direc100,mps100,hmsnum100,sensor100] = lecturafiles(filesi,mpsselec,mpsselec2)
 
-sep = obtener_separador_linux_window();
+if ismac || isunix; sep = '/'; elseif ispc; sep = '\'; end
 
 reg = [];
 dir0 = [];
@@ -25,7 +25,7 @@ for j = 1:length(filesi)
                     extens = '.sac';
                 catch
                     bal = readgcffile2(filesij);
-                    if isscalar(bal)
+                    if isscalar(bal) || sum(isnan(bal)) > 0
                         extens = '';
                     else
                         extens = '.gcf';
@@ -34,6 +34,9 @@ for j = 1:length(filesi)
             end
         end
     end
+    % if ~ismember(extens,{'.sac';'.gcf';'.msd'})
+    %     extens = '';
+    % end
     if strcmp(extens,''); continue; end
 
     regj = [];
@@ -99,29 +102,13 @@ for j = 1:length(filesi)
                 fprintf(1,'\t%s\n',['no se puede leer ',filesij]);
             end
         end
-
     elseif strcmp(extens,'.gcf')
         try
             [regj,sensorj,mpsj,hmsnumj] = readgcffile2(filesij);
-            
-            % ind = strfind(filesij,sep);
-            % rev(1) = {filesij(ind(end-1)+1:ind(end)-1)};
-            % rev(2) = {filesij(ind(end)+1:end-4)};
-            % rev(3) = {sensorj};
-            % if sum(contains(rev,{'e2';'e4';'E2';'E4'})) >= 1
-            %     dirj0 = 'E';
-            % elseif sum(contains(rev,{'n2';'n4';'N2';'N4'})) >= 1
-            %     dirj0 = 'N';
-            % elseif sum(contains(rev,{'z2';'z4';'Z2';'Z4'})) >= 1
-            %     dirj0 = 'Z';
-            % else
-            %     continue
-            % end
             dirj0 = sensorj;
         catch
             fprintf(1,'\t%s\n',['no se puede leer ',filesij]);
         end
-
     elseif strcmp(extens,'.sac')
         try
             [regj,hmsnumj,datos] = rdsac(filesij);
@@ -137,15 +124,6 @@ for j = 1:length(filesi)
 
     dirj0 = upper(dirj0);
     dirj0 = strrep(dirj0,'V','Z');
-    % switch dirj0
-    %     case {'HE';'EHE';'e';'E';'e2';'e4';'E2';'E4';'e0';'3E';'SHE';'ENE';'HNE';'BHE'}
-    %         dirj = 'E';
-    %     case {'HN';'EHN';'n';'N';'n2';'n4';'N2';'N4';'n0';'2N';'SHN';'ENN';'HNN';'BHN'}
-    %         dirj = 'N';
-    %     case {'HZ';'EHZ';'v';'z';'V';'Z';'z2';'z4';'Z2';'Z4';'z0';'1Z';'SHZ';'ENZ';'HNZ';'BHZ'}
-    %         dirj = 'Z';
-    % end
-    % if isempty(dirj); dirj = dirj0; end
 
     reg = [reg;{regj}];
     dir0 = [dir0;dirj0];

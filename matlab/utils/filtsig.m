@@ -9,7 +9,6 @@ taperini = factap*100; %0.1 5
 taperfin = factap*100; %0.1 5
 SIG_tap_int = taper_fun(SIG,taperfin,0,1);
 SIG_tap = taper_fun(SIG_tap_int,taperini,1,0);
-% SIG_tap = tapermanual(SIG,1440,1,1);
 
 % % Revisar este Taper a la señal
 % SIG_tap = SIG.*tukeywin(N,factap);

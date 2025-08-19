@@ -3,8 +3,8 @@ function [EW2,NS2,VE2,w1,w2] = acondsignal(EW,NS,VE,dtnuevo)
 dtorig = dtnuevo;
 
 fmax = 1/(2*dtnuevo);
-w1 = 0; %.05;
-w2 = 0; %fmax-0.1;
+w1 = 0.05;
+w2 = fmax-0.1;
 factap = 0.0;
 
 % % Instrument correct
@@ -52,7 +52,7 @@ else
 
         % % Figura de revisión
         % figure(20)
-        % tiledlayout(3,1);
+        % tiledlayout(3,1)
         % tnuevo = (0:dtnuevo:(length(EW)-1)*dtnuevo)';
         % nexttile(1); plot(tnuevo,NS,'b'); hold on; grid on
         % nexttile(2); plot(tnuevo,EW,'b'); hold on; grid on
@@ -65,10 +65,10 @@ else
         %     end
         % end
 
-        % Quita la tendencia de las señales completas
-        EW = detrend(EW);
-        NS = detrend(NS);
-        VE = detrend(VE);
+        % % Quita la tendencia de las señales completas
+        % EW = detrend(EW);
+        % NS = detrend(NS);
+        % VE = detrend(VE);
 
         % % Resta la media de las señales completas
         % sumdatEW = 0;

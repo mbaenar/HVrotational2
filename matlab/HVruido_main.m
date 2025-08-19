@@ -1,11 +1,16 @@
-clear; clc
-% close all
+% Programa para calcular el cociente espectral HVSR-direccional
+% bajo la hipótesis de campos difusos, empleando señales de
+% ruido sísmico ambiental.
+% Elaborado por Marcela Baena Rivera, Instituto de Ingeniería, UNAM
+
+clear
 format short
 
 cargar_rutas_locales
-
 addpath('utils')
 sep = obtener_separador_linux_window();
+
+if ~exist(rutahv,'dir'); mkdir(rutahv); end
 
 %% DATOS INICIALES
 senhal = 'noise';
@@ -35,12 +40,14 @@ tLTA = 60;               % En segundos
 Smax = 3.5;              % 0=todas las ventanas
 Smin = 0.2;
 dfnew = 1;
+flim1 = 0;   %0         % Frecuencia inicial de cálculo
+flim2 = 2;   %fmax      % Frecuencia final de cálculo
 suav = 1;                % 0=no; 1=sí
 fmthora = 'GMT';         % Formato de hora: 'GMT', 'MXN'
 
-% Si baja el tLTA es más conservador
+% Si el tSTA es pequeño, es más conservador
+
 itertot = length(segvent)*length(porctrasl)*length(horario)*length(normalizac(:,1))*length(tiempoHV);
-separador = obtener_separador_linux_window();
 
 %% Buscar estación
 listest = dir(rutaarch);
@@ -49,42 +56,35 @@ bal = find(ismember(listest,[{'.'};{'..'}])==1);
 listest(bal) = [];
 
 buscar = listest;
-% buscar = {'ICVM'};        % ¡¡¡ESCOGER ESTACIÓN!!!
+% buscar = {'CM012';'CM064'};
 
-%% Invierte la escala de colores,se puede comentar
-col = get_colors(itertot);
+[~,Nbuscar] = ismember(buscar,listest);
 
-%% Ciclo principal
-tetarot = 0:10:180;
-tetarot = 0; %:45:180; %:1:180;
-if length(tetarot) > 1 && isempty(find(tetarot,90))
+%% Bloque principal de ciclos del procesamiento
+
+% Ángulos de rotación para el cálculo del HVDIR
+tetarot = 0:10:180; %:45:180
+% tetarot = 0;
+if length(tetarot) > 1 && ~ismember(90,tetarot)
     tetarot = [tetarot,90];
 end
 tetarot = sort(tetarot);
 
-% Formato de hora
-if strcmp(fmthora,'MXN')
-    hrini = 7;
-    hrfin = 24;
-elseif strcmp(fmthora,'GMT')
-    hrini = 5;
-    hrfin = 11;
-end
-
 % *****************************************************
-% CICLO DE ESTACIONES
+% CICLO GLOBAL DE ESTACIONES
 % *****************************************************
-[~,Nbuscar] = ismember(buscar,listest);
+% parfor ee = 1:length(buscar)
 for ee = 1:length(buscar)
     estac = listest{Nbuscar(ee)};
     fprintf(1,'%d%s%d%s%s\n',ee,'/',length(buscar),' --> ',estac);
 
     % *****************************************************
-    % ESTRUCTURA HV.
+    % ESTRUCTURA "HV"
     % *****************************************************
     % estac: nombre de la estación
-    % paraadic: parámetros adicionales (fechas, número de ventanas para H/V, parámetros para STA/LTA, df)
+    % paramadic: parámetros adicionales (fechas, número de ventanas para H/V, parámetros para STA/LTA, df)
     % clavecomb: clave de cada combinación de parámetros
+    % fechahms: fechas empleadas en cada combinación de parámetros
     % Nvent: número de ventanas empleadas para el H/V
     % fcomb: vector de frecuencias
     % HVmean_comb: matriz con el H/V medio de cada combinación de parámetros (por columna)
@@ -92,38 +92,36 @@ for ee = 1:length(buscar)
     % EVmean_comb: matriz con el H/V de cada combinación de parámetros, usando solo la componente este-oeste (por columna)
     % tiempoHV_orig_min: tiempo solicitado para el cálculo del H/V
     % tiempoHV_real_min: tiempo real empleado para el cálculo del H/V
-    % f_comb1: vector de frecuencias de la combinación de parámetros 1
-    % HVtot_comb1: H/V de la combinación de parámetros 1
     % HVdir_comb1: H/V direccional norte-sur empleando la combinación de parámetros 1
     % tetarot: vector de ángulos de rotación para el H/V direccional
-    HV = struct('estac',[],'paraadic',[],'clavecomb',[],'Nvent',[],'fcomb',[],'HVmean_comb',[],'NVmean_comb',[],'EVmean_comb',[], ...
-        'tiempoHV_orig_min',[],'tiempoHV_real_min',[], ...
-        'f_comb1',[],'HVtot_comb1',[],'HVdir_comb1',[],'tetarot',[]);
+    HV = struct('estac',[],'paramadic',[],'clavecomb',[],'fechahms',[],'Nvent',[],'fcomb',[],'HVmean_comb',[],'NVmean_comb',[],'EVmean_comb',[], ...
+        'tiempoHV_orig_min',[],'tiempoHV_real_min',[],'HVdir_comb1',[],'tetarot',[]);
     HV.estac = estac;
-    HV.paraadic.ventaleatHV = ventaleatHV;
-    HV.paraadic.NvBootstrap = NvBootstrap;
-    HV.paraadic.tSTA = tSTA;
-    HV.paraadic.tLTA = tLTA;
-    HV.paraadic.Smax = Smax;
-    HV.paraadic.Smin = Smin;
-    HV.paraadic.NdiasHV = NdiasHV0;
+    HV.paramadic.ventaleatHV = ventaleatHV;
+    HV.paramadic.NvBootstrap = NvBootstrap;
+    HV.paramadic.tSTA = tSTA;
+    HV.paramadic.tLTA = tLTA;
+    HV.paramadic.Smax = Smax;
+    HV.paramadic.Smin = Smin;
+    HV.paramadic.NdiasHV = NdiasHV0;
     HV.tetarot = tetarot;
     % *****************************************************
 
     crear_directorios(rutahv,estac)
-    nombgrab = [rutahv,estac,[separador 'HV_'],estac];
+    nombgrab = [rutahv,estac,[sep 'HV_'],estac];
 
     listreg = dir([rutaarch,estac,sep,'*.mat']);
     listreg = {listreg.name}'; %name
 
-    NdiasHV = NdiasHV0; % Puede modificarse
+    NdiasHV = NdiasHV0;  % Puede modificarse
     [listdias,listdiashoras] = obtener_lista_dias(listreg,NdiasHV);
-    suma = 0;
+    durdiashoras = zeros(length(listdiashoras),1);
     for ll = 1:length(listdiashoras)
-        suma = suma+length(listdiashoras{ll});
+        durdiashoras(ll) = length(listdiashoras{ll});
     end
-    if suma ~= length(listreg); fprintf(1,'\t%s\n','revisar suma~=length(listreg)'); end
+    if sum(durdiashoras) ~= length(listreg); fprintf(1,'\t%s\n','revisar suma~=length(listreg)'); end
     listaciclo = listdiashoras;
+    [~,bal] = sort(durdiashoras,'descend');
 
     % % Desbloquear si se va a calcular por días en particular
     % buscardia = {'20130413'; '20131213'; '20161022'; '20171230'; '20180503'; '20180704'; '20180711'; '20180821'; '20180829'; '20180921'; '20181006'; '20181007'; '20181013'; '20181016'; '20181201'; '20181212'; '20181221'; '20190114'; '20190123'; '20190223'; '20190317'; '20190403'; '20190405'; '20190407'; '20190421'; '20191106'; '20191115'; '20200113'; '20200804'; '20210314'};
@@ -145,190 +143,129 @@ for ee = 1:length(buscar)
     % end
 
     % *****************************************************
-    % CICLO DE DÍAS U HORAS
+    % CICLO GLOBAL DE DÍAS U HORAS
     % *****************************************************
     leyenda = [];
-    for dd = 1 %:length(listaciclo) %1:length(listaciclo)  %Nbuscardia.'
+    ciclodiashoras = bal(1);   % Escoger       %1:length(listaciclo); %Nbuscardia.'
+    for dd = ciclodiashoras
         diahoras = listaciclo{dd};
-        nombgrab0 = [nombgrab,'_',diahoras{1}(1:8),'.mat'];
+        nombgrab0 = [nombgrab,'_',diahoras{1},'.mat'];
         % if exist(nombgrab0,'file') ~= 0; continue; end
 
         fprintf(1,'\t%s%d%s%d%s%s\n','Núm H/V ',dd,'/',length(listaciclo),' --> ',diahoras{1});
 
         % *****************************************************
-        % CICLO DE HORARIO
+        % LECTURA DE DATOS. ESTRUCTURA "ESTR"
         % *****************************************************
+        [ESTR,ii] = F_ESTR(rutaarch,estac,diahoras,w1new,w2new,fmthora);
+        
+        if ii == 0; continue; end
+
+        dt = ESTR.dt;
+        w1 = ESTR.w1;
+        w2 = ESTR.w2;
+        unid = ESTR.unidad;
+        fmax = 1/(2*dt);
+
+        % *****************************************************
+        % CICLO GLOBAL DE HORARIO
+        % *****************************************************
+        iter = 0;
+        ccd = 0;
         for hh = 1:length(horario)
-            hora = [];
-            for bb = 1:length(diahoras)
-                hora(bb,1) = str2double(diahoras{bb}(9:10));
+            hora = zeros(length(ESTR.vecfechahms),1);
+            for bb = 1:length(ESTR.vecfechahms)
+                hora(bb,1) = str2double(ESTR.vecfechahms{bb}(9:10));
             end
 
-            diahoraselec = diahoras;
-            if horario(hh) == 1
-                if strcmp(fmthora,'MXN'); diahoraselec = diahoras( and(hora>=hrini,hora<=hrfin)); end
-                if strcmp(fmthora,'GMT'); diahoraselec = diahoras(~and(hora>=hrini,hora<=hrfin)); end
-            elseif horario(hh) == 2
-                if strcmp(fmthora,'MXN'); diahoraselec = diahoras(~and(hora>=hrini,hora<=hrfin)); end
-                if strcmp(fmthora,'GMT'); diahoraselec = diahoras( and(hora>=hrini,hora<=hrfin)); end
+            [diahoraselec,horariograb] = selecdiahora(fmthora,ESTR.vecfechahms,hora,horario(hh));
+            if isempty(diahoraselec)
+                continue
             end
 
-            % *****************************************************
-            % CICLO LECTURA DE DATOS SEGÚN EL HORARIO
-            % *****************************************************
-            ESTR = [];
-            ii = 0;
-            for p = 1:length(diahoraselec) %NdiasHV
-                diahora = diahoraselec{p};
-                load([rutaarch,estac,sep,diahora])
-
-                minmas = 0;
-                if p == 1 && length(diahoraselec) > 1
-                    minmas = 10;
-                end
-                Nminmas = minmas*60/REG.dt+1;
-                
-                EW2 = REG.EW(Nminmas:end);
-                NS2 = REG.NS(Nminmas:end);
-                VE2 = REG.VE(Nminmas:end);
-                w1 = REG.w1;
-                w2 = REG.w2;
-                
-                % % ¡¡¡REVISAR!!!Para registros de 24 horas
-                % long24hr = 23.5*60*60/REG.dt;
-                % if length(EW2) >= long24hr
-                %     Nhrini = hrini*60*60/REG.dt;
-                %     Nhrfin = hrfin*60*60/REG.dt;
-                %     if horario(hh) == 1
-                %         if strcmp(fmthora,'MXN')
-                %             EW2 = EW2(Nhrini:Nhrfin);
-                %             NS2 = NS2(Nhrini:Nhrfin);
-                %             VE2 = VE2(Nhrini:Nhrfin);
-                %         end
-                %         if strcmp(fmthora,'GMT')
-                %             EW2(Nhrini:Nhrfin) = 0;
-                %             NS2(Nhrini:Nhrfin) = 0;
-                %             VE2(Nhrini:Nhrfin) = 0;
-                %         end
-                %     elseif horario(hh) == 2
-                %         if strcmp(fmthora,'MXN')
-                %             EW2 = EW2(1:Nhrini);
-                %             NS2 = NS2(1:Nhrini);
-                %             VE2 = VE2(1:Nhrini);
-                %         end
-                %         if strcmp(fmthora,'GMT')
-                %             EW2 = EW2(Nhrini:Nhrfin);
-                %             NS2 = NS2(Nhrini:Nhrfin);
-                %             VE2 = VE2(Nhrini:Nhrfin);
-                %         end
-                %     end
-                % end
-
-                if sum(EW2) ~= 0 || sum(NS2) ~= 0 || sum(VE2) ~= 0
-                    ii = ii+1;
-                    ESTR.EW{ii,1} = double(EW2);
-                    ESTR.NS{ii,1} = double(NS2);
-                    ESTR.VE{ii,1} = double(VE2);
-                    ESTR.vecfechahms{ii,1} = [diahora(1:8),'_',diahora(9:end-4)];
-                    if ii == 1
-                        ESTR.dt = REG.dt;
-                        ESTR.unidad = REG.unidad;
-                    end
-
-                    % Nuevo filtro entre w1 y w2
-                    if w1new > 0 || w2new > 0
-                        if w1new ~= 0; w1 = w1new; end
-                        if w2new ~= 0; w2 = w2new; end
-                        ESTR.EW{ii} = filtsig(ESTR.EW{ii},ESTR.dt,w1,w2,factap);
-                        ESTR.NS{ii} = filtsig(ESTR.NS{ii},ESTR.dt,w1,w2,factap);
-                        ESTR.VE{ii} = filtsig(ESTR.VE{ii},ESTR.dt,w1,w2,factap);
-                    end
-                end
-            end
-            if ii == 0; continue; end
-            
-            HV.paraadic.fechahms = ESTR.vecfechahms;
-
-            dt = ESTR.dt;
-            unid = ESTR.unidad;
-            fmax = 1/(2*dt);
-            Narch = size(ESTR.EW,1);
-            f0 = [];
+            [~,ind] = ismember(diahoraselec,ESTR.vecfechahms);
+            vecfechahms2 = ESTR.vecfechahms(ind);
+            EWind = ESTR.EW(ind);
+            NSind = ESTR.NS(ind);
+            VEind = ESTR.VE(ind);
 
             % *****************************************************
-            % CICLO ÁNGULOS DE ROTACIÓN
+            % CICLO GLOBAL LONGITUD DE VENTANAS
             % *****************************************************
-            HV.HVdir_comb1 = [];
-            contteta = 0;
-            for Nteta = 1:length(tetarot)
-                contteta = contteta+1;
-                iter = 0;
-                ccd = 0;
-
-                % Rotación sismogramas
-                teta = tetarot(Nteta);
-                [EWrot,NSrot] = rotar_sismogramas(ESTR,teta,Narch);
-
-                fprintf(1,'\t\t%s%d%s%d%s%d%s\n','teta ',Nteta,'/',length(tetarot),' --> ',teta,'°');
+            for vv = 1:length(segvent)
+                flim2def = flim2;
+                if flim2def > fmax; flim2def = fmax; end
+                [f,fin,ini,ptosvent,Nespec,df] = obtener_vector_de_frecuencia(segvent(vv), ...
+                    dt,dfnew,fmax,flim1,flim2def);
 
                 % *****************************************************
-                % CICLO LONGITUD DE VENTANAS
+                % CICLO GLOBAL TRASLAPE DE VENTANAS
                 % *****************************************************
-                for vv = 1:length(segvent)
-                    flim1 = 0; %0
-                    flim2 = fmax; %5; %20
-                    [f,fin,ini,ptosvent,Nespec,df] = obtener_vector_de_frecuencia(segvent(vv), ...
-                        dt,dfnew,fmax,flim1,flim2);
+                wincleantot = [];
+                for tt = 1:length(porctrasl)
+
+                    % VENTANEO
+                    [Nventefec,M,iv,fv,wincleantot,STALTAEW,STALTANS,STALTAVE] = ventaneo(porctrasl(tt), ...
+                        ptosvent,EWind,NSind,VEind,dt,tSTA,tLTA,Smax,Smin);
+
+                    % % Figuras para revisión
+                    % plot_figura300(EWind,NSind,VEind,dt,wincleantot,iv,fv,Smax,STALTANS,STALTAEW,STALTAVE)
+                    % close(300)
 
                     % *****************************************************
-                    % CICLO TRASLAPE DE VENTANAS
+                    % CICLO GLOBAL DE NORMALIZACIÓN
                     % *****************************************************
-                    wincleantot = [];
-                    for tt = 1:length(porctrasl)
+                    for norm = 1:length(normalizac(:,1))
+                        band = normalizac(norm,1);
+                        onebit = normalizac(norm,2);
 
-                        % VENTANEO
-                        [Nventefec,M,iv,fv,wincleantot,wincleanEW,wincleanNS, ...
-                            wincleanVE,STALTAEW,STALTANS,STALTAVE] = ventaneo(porctrasl(tt), ...
-                            ptosvent,EWrot,NSrot,ESTR.VE,dt,tSTA,tLTA,Smax,Smin,Narch);
-
-                        % Figuras para revisión
-                        plot_figura300(EWrot,NSrot,ESTR.VE,Narch,dt,wincleantot,iv,fv,Smax,STALTANS,STALTAEW,STALTAVE)
-                        close(300)
-
-                        % DIVISIÓN DE LA SEÑAL EN VENTANAS DE TIEMPO
-                        [EWv,NSv,VEv,fechahmsvent] = division_ventanas_tiempo(EWrot,NSrot,ESTR.VE,ESTR.vecfechahms,ptosvent, ...
-                            Nventefec,Narch,wincleantot,iv,fv);
+                        % Carpeta y archivo para grabar resultados
+                        nombcomb = nombre_combinac(senhal,unid,band,w1,w2,onebit,horariograb,segvent(vv),porctrasl(tt));
 
                         % *****************************************************
-                        % CICLO DE NORMALIZACIÓN
+                        % CICLO GLOBAL DE TIEMPO PARA CÁLCULO DE H/V
                         % *****************************************************
-                        for norm = 1:length(normalizac(:,1))
-                            band = normalizac(norm,1);
-                            onebit = normalizac(norm,2);
-
-                            % Carpeta y archivo para grabar resultados
-                            nombcomb = nombre_combinac(senhal,unid,band,w1,w2,onebit,horario(hh),segvent(vv),porctrasl(tt));
-
-                            % NORMALIZACIÓN
-                            [fNSventnorm,fVEventnorm,fEWventnorm,~,~,~,~,~] = F_normalizacionfrec(NSv,VEv,EWv, ...
-                                Nespec,band,onebit,dt,factap);
-
-                            [fNSvent,fEWvent,fVEvent,fHHvent] = obtener_valores_absolutos(fNSventnorm,fEWventnorm,fVEventnorm,ini,fin);
-
-                            fNSventnorm = [];
-                            fEWventnorm = [];
-                            fVEventnorm = [];
+                        for nh = 1:length(tiempoHV)
+                            iter = iter+1;
+                            fprintf(1,'\t\t%s%d%s%d\n','iter ',iter,'/',itertot);
 
                             % *****************************************************
-                            % CICLO DE TIEMPOS PARA CÁLCULO DE H/V
+                            % CICLO LOCAL ÁNGULOS DE ROTACIÓN
                             % *****************************************************
-                            for nh = 1:length(tiempoHV)
-                                iter = iter+1;
-                                fprintf(1,'\t\t\t%s%d%s%d\n','iter ',iter,'/',itertot);
+                            contteta = 0;
+                            if iter == 1
+                                HV.HVdir_comb1 = [];
+                            end
+                            Ntetarot = length(tetarot);
+                            if iter > 1
+                                Ntetarot = 1;
+                            end
+                            for Nteta = 1:Ntetarot
+                                contteta = contteta+1;
+
+                                % ROTACIÓN SISMOGRAMAS
+                                teta = tetarot(Nteta);
+                                [EWindrot,NSindrot] = rotar_sismogramas(EWind,NSind,teta);
+
+                                fprintf(1,'\t\t\t%s%d%s%d%s%d%s\n','teta ',Nteta,'/',length(tetarot),' --> ',teta,'°');
+
+                                % DIVISIÓN DE LA SEÑAL EN VENTANAS DE TIEMPO
+                                [EWv,NSv,VEv] = division_ventanas_tiempo(EWindrot,NSindrot,VEind, ...
+                                    ptosvent,Nventefec,wincleantot,iv,fv);
+
+                                % NORMALIZACIÓN
+                                [fNSvent,fVEvent,fEWvent,~,~,~,~,~] = F_normalizacionfrec(NSv,VEv,EWv, ...
+                                    Nespec,band,onebit,dt,factap);
+
+                                if Nventefec > 100
+                                    fNSvent = fNSvent(:,1:100);
+                                    fEWvent = fEWvent(:,1:100);
+                                    fVEvent = fVEvent(:,1:100);
+                                end
 
                                 % CÁLCULO DE H/V
-                                [HVmean,NVmean,EVmean,NventHV,vini,tiempoHVnuevo,numHV,HVvent] = F_HVruido(f,fNSvent,fEWvent, ...
-                                    fVEvent,fHHvent,segvent(vv),porctrasl(tt),tiempoHV(nh),suav,ventaleatHV,NvBootstrap);
+                                [HVmean,NVmean,EVmean,NventHV,vini,tiempoHVnuevo,numHV,HVvent] = F_HVruido(f,fNSvent, ...
+                                    fEWvent,fVEvent,segvent(vv),porctrasl(tt),tiempoHV(nh),suav,ventaleatHV,NvBootstrap,ini,fin);
 
                                 tiempoHVnuevo_str = num2str(round(tiempoHVnuevo*100)/100);
                                 clavecomb = ['CD-HV',tiempoHVnuevo_str,'hr','-',nombcomb,'-Nw',num2str(NventHV(1)),'-NwBS',num2str(numHV)];
@@ -336,6 +273,7 @@ for ee = 1:length(buscar)
                                 if contteta == 1
                                     ccd = ccd+1;
                                     HV.clavecomb{ccd} = clavecomb;
+                                    HV.fechahms{ccd} = vecfechahms2;
                                     HV.Nvent{ccd} = NventHV(1);
                                     HV.fcomb{ccd} = f;
                                     HV.HVmean_comb{ccd} = HVmean;
@@ -347,10 +285,6 @@ for ee = 1:length(buscar)
 
                                 if iter == 1
                                     HV.HVdir_comb1 = [HV.HVdir_comb1;NVmean.'];
-                                    if contteta == 1
-                                        HV.f_comb1 = HV.fcomb{1};
-                                        HV.HVtot_comb1 = HV.HVmean_comb{1};
-                                    end
                                 end
                             end
                             NSv = [];
@@ -359,26 +293,24 @@ for ee = 1:length(buscar)
                         end
                     end
                 end
-
-                %% Figura
-                if contteta == 1 && Nventefec > 0
-                    [leyenda] = figure_ee(ee,leyenda,HV,estac);
-                    drawnow
-                    % print(gcf,nombgrab0(1:end-4),'-dpng','-r600')
-                    % close(h)
-
-                    % % Generación de archivo de texto para inversión
-                    % f1 = 0.001;
-                    % f2 = 1;
-                    % paso = 3;
-                    % fs = 6;
-                    % [HVesc,fsesc] = archivo_inversion(HV.HVmean_comb{1},HV.fcomb{1},f1,f2,paso,fs);
-                    % dlmwrite([rutahv,'HV-',estac,'.txt'],[fsesc,HVesc],'delimiter','\t','precision','%14.8f')
-                end
             end
-            % if Nventefec > 0
-            %     save(nombgrab0,'HV','-v7.3');
-            % end
         end
+
+        %% Figura
+        % [leyenda] = figure_ee(ee,leyenda,HV,estac);
+        % drawnow
+        % % print(gcf,nombgrab0(1:end-4),'-dpng','-r600')
+        % % close(h)
+
+        % % Generación de archivo de texto para inversión
+        % f1 = 0.001;
+        % f2 = 1;
+        % paso = 3;
+        % fs = 6;
+        % [HVesc,fsesc] = archivo_inversion(HV.HVmean_comb{1},HV.fcomb{1},f1,f2,paso,fs);
+        % dlmwrite([rutahv,'HV-',estac,'.txt'],[fsesc,HVesc],'delimiter','\t','precision','%14.8f')
+
+        % Guardar en un archivo .mat estructura "HV"
+        funsave(nombgrab0,HV)     % Esta función es para poder parametrizar el código. En la línea 74, usar 'parfor'
     end
 end

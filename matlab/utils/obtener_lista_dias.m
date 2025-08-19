@@ -20,6 +20,6 @@ for i = 1:length(diaini)
     for j = dia1:dia2
         listdiash = [listdiash;listreg(ismember(listdias00,listdias{j}))];
     end
-    listdiashoras{i,1} = listdiash;
+    listdiashoras{i,1} = strrep(listdiash,'.mat','');
     [dia1 dia2 dia2-dia1+1];
 end
