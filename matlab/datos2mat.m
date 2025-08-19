@@ -1,8 +1,11 @@
+% Programa para leer paquetes de tres registros: NS, EW y VE,
+% en formato sac, gcf y msd, y guardarlos en un solo archivo en formato mat.
+% Elaborado por Marcela Baena Rivera, Instituto de Ingeniería, UNAM
+
 clear
 format short
 
 cargar_rutas_locales
-
 addpath('utils')
 sep = obtener_separador_linux_window();
 
@@ -14,20 +17,19 @@ listest(ismember(listest,[{'.'};{'..'}])) = [];
 %% DATOS INICIALES
 unidad = 'velo'; %velo; acel
 
-%% S
-buscar = {'ANGA'};    %¡¡¡ESCOGER ESTACIÓN!!!%
-% buscar = listest;
+%% Buscar estación
+% buscar = {'PA01'};    %¡¡¡ESCOGER ESTACIÓN!!!%
+buscar = listest;
+
+[~,Nbuscar] = ismember(buscar,listest);
 
 %%
-if ~exist(rutaarch,'dir'); mkdir(rutaarch); end
-
 % Ciclo estaciones
-[~,Nbuscar] = ismember(buscar,listest);
-for k = 1:length(buscar)
+for k = 2:length(buscar)
     estac = listest{Nbuscar(k)};
 
     fprintf(1,'%d%s%d%s%s\n',k,'\',length(buscar),' --> ',estac);
-    if ~exist([rutaarch,estac],'dir'); mkdir([rutaarch,estac]); end
+    crear_directorios(rutaarch,estac)
 
     % Listas de carpetas y archivos
     files = trescanales(rutadatos,listest{Nbuscar(k)});
@@ -38,17 +40,16 @@ for k = 1:length(buscar)
     end
     %%%%%%%%%%%%%%%%%%%%%%
 
-    % Selección de días en particular
-    filesnew = [];
-    for i = 1:length(files)
-        if contains(files{i}{1},{'20240707';'20240709'})
-            filesnew = [filesnew;files(i)];
-        end
-    end
-    files = filesnew;
+    % filesnew = [];
+    % for i = 1:length(files)
+    %     if contains(files{i}{1},'202310')
+    %         filesnew = [filesnew;files(i)];
+    %     end
+    % end
+    % files = filesnew;
 
     % Lectura de archivos
-    for i = 1:length(files)
+    for i = length(files)-20:length(files)-16
         filesi = files{i};
 
         fprintf(1,'\t%d%s%d\n',i,'\',length(files));
@@ -117,19 +118,7 @@ for k = 1:length(buscar)
 
         [EW,NS,VE,w1,w2] = acondsignal(EW,NS,VE,dt);
 
-        REG.nombarch = [fechahms,'.mat'];
-        REG.estac = estac;
-        REG.sensor = sensor;
-        REG.unidad = unidad;
-        REG.mps = mps(1);
-        REG.dt = dt;
-        REG.w1 = w1;
-        REG.w2 = w2;
-        REG.NS = NS;
-        REG.VE = VE;
-        REG.EW = EW;
-        REG.fechahms = fechahms;
-
-        save(nombarch,'REG','-v7.3');
+        % Genera y guarda la estructura "REG" con los datos de los tres registros: NS, EW, VE
+        funREG(fechahms,estac,sensor,unidad,mps(1),dt,w1,w2,NS,VE,EW,nombarch)
     end
 end

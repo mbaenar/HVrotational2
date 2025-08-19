@@ -108,7 +108,8 @@ end
 elim = [];
 for i = 1:length(files)
     [~,~,extens] = fileparts(files{i});
-    elimarch = contains(extens,{'.txt';'.jpg'});
+    extens = lower(extens);
+    elimarch = contains(extens,{'.txt';'.jpg';'.pdf';'.xlsx'});
     files{i}(elimarch) = [];
     if isempty(files{i})
         elim = [elim;i];

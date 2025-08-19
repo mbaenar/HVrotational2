@@ -1,6 +1,6 @@
-function plot_figura300(EWrot,NSrot,VE,Ndias,dt,wincleantot,iv,fv,Smax,STALTANS,STALTAEW,STALTAVE)
+function plot_figura300(EWrot,NSrot,VE,dt,wincleantot,iv,fv,Smax,STALTANS,STALTAEW,STALTAVE)
 
-for p = 1:Ndias
+for p = 1:length(VE)
     figure(300);
     set(gcf,'Position',get(0,'Screensize'));
     fig = tiledlayout(3,2,'TileSpacing','tight','Padding','tight');

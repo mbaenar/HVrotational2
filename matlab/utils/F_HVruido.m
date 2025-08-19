@@ -1,9 +1,8 @@
-function [HVmean,NVmean,EVmean,NventHV, ...
-    vini,tiempoHVnuevo,numHV,HVvent] = F_HVruido(f,fNSvent,fEWvent,...
-    fVEvent,fHHvent,segvent,porctrasl,tiempoHV,suav,ventaleatHV,NvBootstrap)
+function [HVmean,NVmean,EVmean,NventHV,vini,tiempoHVnuevo,numHV,HVvent] = F_HVruido(f,fNSvent, ...
+    fEWvent,fVEvent,segvent,porctrasl,tiempoHV,suav,ventaleatHV,NvBootstrap,ini,fin)
 
 % Datos iniciales
-[N,Nv] = size(fNSvent);
+[~,Nv] = size(fNSvent);
 Nsuav = 0; %fix(N*0.001);
 fs = 12; %50;
 
@@ -33,16 +32,17 @@ rev2 = sum((vf-vi+1)<pasovent*0.70);
 numHV = length(vi);
 NventHV = vf-vi+1;
 vini = vi(1);
-HVvent = (zeros(N,numHV));
-NVvent = (zeros(N,numHV));
-EVvent = (zeros(N,numHV));
-fNSvent2 = abs(fNSvent).^2;
-fEWvent2 = abs(fEWvent).^2;
-fVEvent2 = abs(fVEvent).^2;
-fHHvent2 = abs(fHHvent).^2;
+fNSvent2 = abs(fNSvent(ini:fin,:)).^2;
+fEWvent2 = abs(fEWvent(ini:fin,:)).^2;
+fVEvent2 = abs(fVEvent(ini:fin,:)).^2;
+fHHvent2 = abs(sqrt((fNSvent(ini:fin,:).^2+fEWvent(ini:fin,:).^2)/2)).^2;
 
 % HV con Campos Difusos
 % ---------------------
+N = fin-ini+1;
+HVvent = (zeros(N,numHV));
+NVvent = (zeros(N,numHV));
+EVvent = (zeros(N,numHV));
 for i = 1:numHV
     vec = vi(i):vf(i);
     dNS = fNSvent2(:,vec);
