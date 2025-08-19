@@ -25,7 +25,7 @@ buscar = listest;
 
 %%
 % Ciclo estaciones
-for k = 2:length(buscar)
+for k = 1:length(buscar)
     estac = listest{Nbuscar(k)};
 
     fprintf(1,'%d%s%d%s%s\n',k,'\',length(buscar),' --> ',estac);
